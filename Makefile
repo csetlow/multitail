@@ -1,6 +1,6 @@
 include version
 
-UTF8_SUPPORT=yes
+UTF8_SUPPORT=no
 DESTDIR=/
 CONFIG_FILE=$(DESTDIR)/etc/multitail.conf
 

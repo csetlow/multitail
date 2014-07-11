@@ -607,7 +607,7 @@ void do_color_print(proginfo *cur, char *use_string, int prt_start, int prt_end,
 
 	if (cur -> line_wrap == 'w')
 	{
-		gen_wordwrap_offsets(use_string, prt_start, prt_end, getmaxx(win -> win), &ww);
+		//gen_wordwrap_offsets(use_string, prt_start, prt_end, getmaxx(win -> win), &ww);
 	}
 
 	/* print text */
@@ -710,8 +710,29 @@ void do_color_print(proginfo *cur, char *use_string, int prt_start, int prt_end,
 			{
 				disp_offset += draw_tab(win);
 			}
+            /* Need to pass through newlines. */
+			else if (wcur == 10)
+            {
+                    int x, y;
+                    getyx(win -> win, y, x);
+                    int xm, ym;
+                    getmaxyx(win -> win, ym, xm);
+                    if (y == ym - 1)
+                    {
+                      wscrl(win -> win, 1);
+                      y--;
+                    }
+                    wmove(win -> win, y + 1, 0);
+            }
+			else if (wcur == 13)
+            {
+					//wprintw(win -> win, "\r");
+                    int x, y;
+                    getyx(win -> win, y, x);
+                    wmove(win -> win, y, 0);
+            }
 			/* 13 (CR) is just silently ignored */
-			else if (wcur != 13)
+            else if (wcur != 13)
 			{
 				if (caret_notation)
 				{
@@ -731,8 +752,8 @@ void do_color_print(proginfo *cur, char *use_string, int prt_start, int prt_end,
 		offset += count_utf_bytes(use_string[offset]);
 	}
 
-	if (prt_start == prt_end)       /* scrolled out line */
-		wprintw(win -> win, "\n");
+	//if (prt_start == prt_end)       /* scrolled out line */
+		//wprintw(win -> win, "\n");
 
 	if (cdev.attrs != -1)
 		myattr_off(win, cdev);
@@ -764,8 +785,8 @@ void color_print(int f_index, NEWWIN *win, proginfo *cur, char *string, regmatch
 	 */
 	mx = getmaxx(win -> win);
 	x = getcurx(win -> win);
-	if ((x != 0 && x != mx) || !suppress_empty_lines)
-		wprintw(win -> win, "\n");
+	//if ((x != 0 && x != mx) || !suppress_empty_lines)
+		//wprintw(win -> win, "\n");
 
 	/* cur == NULL? Markerline! */
 	if (IS_MARKERLINE(cur))
@@ -3201,103 +3222,119 @@ int process_global_keys(int what_help, NEWWIN *popup, char cursor_shift)
 
 char process_input_data(int win_nr, proginfo *cur, char *data_in, int new_data_offset, int n_bytes_added, double now)
 {
-	char *pnt = data_in;
-	char statusline_update_needed = 0;
+    char *pnt = data_in;
+    char statusline_update_needed = 0;
 
-	/* statistics */
-	cur -> statistics.bytes_processed += n_bytes_added;
+    /* statistics */
+    cur -> statistics.bytes_processed += n_bytes_added;
 
-	data_in[new_data_offset + n_bytes_added] = 0x00;
+    data_in[new_data_offset + n_bytes_added] = 0x00;
 
-	if (strchr(&data_in[new_data_offset], '\n'))
-	{
-		char emitted = 0;
+    //if (strchr(&data_in[new_data_offset], '\n'))
+    if (n_bytes_added)
+    {
+        char emitted = 0;
+        char lost = 0;
 
-		if (cur -> cont) /* reconnect lines with '\' */
-		{
-			char *contsearch = pnt;
+        if (cur -> cont) /* reconnect lines with '\' */
+        {
+            char *contsearch = pnt;
 
-			while((contsearch = strstr(contsearch, "\\\n")))
-			{
-				memmove(contsearch, contsearch + 2, strlen(contsearch + 2) + 1);
-			}
-		}
+            while((contsearch = strstr(contsearch, "\\\n")))
+            {
+                memmove(contsearch, contsearch + 2, strlen(contsearch + 2) + 1);
+            }
+        }
 
-		/* display lines */
-		for(;*pnt;)
-		{
-			char *end = strchr(pnt, '\n');
-			if (!end)
-				break;
+        /* display lines */
+        for(;*pnt;)
+        {
+            char *end = strchr(pnt, '\n');
+            end = NULL;
+            if (!end)
+            {
+                // Handle partial lines here!!!!
+                //break;
+                end = data_in + new_data_offset + n_bytes_added;
+                lost = *end;
+            }
 
-			*end = 0x00;
+            *end = 0x00;
 
-			/* redirect to some other file/pipe? */
-			redirect(cur, pnt, (int)(end - pnt), MY_FALSE);
+            /* redirect to some other file/pipe? */
+            redirect(cur, pnt, (int)(end - pnt), MY_FALSE);
 
-			/* gen stats */
-			store_statistics(cur, now);
+            /* gen stats */
+            store_statistics(cur, now);
 
-			/* see if we need to beep already */
-			if (beep_interval > 0)
-			{
-				if (++linecounter_for_beep == beep_interval)
-				{
-					linecounter_for_beep = 0;
-					did_n_beeps++;
-					beep();
-				}
-			}
+            /* see if we need to beep already */
+            if (beep_interval > 0)
+            {
+                if (++linecounter_for_beep == beep_interval)
+                {
+                    linecounter_for_beep = 0;
+                    did_n_beeps++;
+                    beep();
+                }
+            }
 
-			/* beep per (sub-)window */
-			if (cur -> beep.beep_interval > 0)
-			{
-				if (++cur -> beep.linecounter_for_beep == cur -> beep.beep_interval)
-				{
-					cur -> beep.linecounter_for_beep = 0;
-					cur -> beep.did_n_beeps++;
-					beep();
-				}
-			}
+            /* beep per (sub-)window */
+            if (cur -> beep.beep_interval > 0)
+            {
+                if (++cur -> beep.linecounter_for_beep == cur -> beep.beep_interval)
+                {
+                    cur -> beep.linecounter_for_beep = 0;
+                    cur -> beep.did_n_beeps++;
+                    beep();
+                }
+            }
 
-			/* is this the output of a program which we should diff and such? */
-			if (cur -> restart.do_diff)
-			{
-				store_for_diff(&cur -> restart.diff, pnt);
-			}
-			else /* no, just output */
-			{
-				if (get_do_refresh() == 0)
-					set_do_refresh(1); /* after update interval, update screen */
+            /* is this the output of a program which we should diff and such? */
+            if (cur -> restart.do_diff)
+            {
+                store_for_diff(&cur -> restart.diff, pnt);
+            }
+            else /* no, just output */
+            {
+                if (get_do_refresh() == 0)
+                    set_do_refresh(1); /* after update interval, update screen */
 
-				statusline_update_needed |= emit_to_buffer_and_term(win_nr, cur, pnt);
-			}
+                statusline_update_needed |= emit_to_buffer_and_term(win_nr, cur, pnt);
+            }
 
-			if (!emitted)
-			{
-				emitted = 1;
+            if (!emitted)
+            {
+                emitted = 1;
 
-				if (cur -> restart.is_restarted && cur -> restart.restart_clear)
-				{
-					cur -> restart.is_restarted = 0;
-					werase(pi[win_nr].data -> win);
-				}
+                if (cur -> restart.is_restarted && cur -> restart.restart_clear)
+                {
+                    cur -> restart.is_restarted = 0;
+                    werase(pi[win_nr].data -> win);
+                }
 
-				update_panels();
-			}
+                update_panels();
+            }
 
-			pnt = end + 1;
-		}
-	}
+            pnt = end + 1;
+            if (end == data_in + new_data_offset + n_bytes_added)
+            {
+                pnt = end;
+                *pnt = 0x00;
+                break;
+            }
+            *pnt = 0x00;
+        }
+    }
 
-	if (*pnt != 0x00)
-	{
-		int line_len = strlen(pnt) + 1;
-		cur -> incomplete_line = mymalloc(line_len);
-		memcpy(cur -> incomplete_line, pnt, line_len);
-	}
 
-	return statusline_update_needed;
+    //	if (*pnt != 0x00)
+    //	{
+    //		int line_len = strlen(pnt) + 1;
+    //		cur -> incomplete_line = mymalloc(line_len);
+    //		memcpy(cur -> incomplete_line, pnt, line_len);
+    //	}
+
+    return statusline_update_needed;
 }
 
 int recv_from_fd(int fd, char **buffer, int new_data_offset, int read_size)
